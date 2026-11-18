@@ -295,7 +295,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE prev,PWSTR line,int show) {
     INITCOMMONCONTROLSEX common={sizeof(common),ICC_BAR_CLASSES};InitCommonControlsEx(&common);uiReadSettings();uiBgBrush=CreateSolidBrush(UI_BG);uiSurfaceBrush=CreateSolidBrush(UI_SURFACE);
     WNDCLASSW wc={0}; wc.lpfnWndProc=proc; wc.hInstance=instance; wc.lpszClassName=L"ScreenRecorderNative";
     wc.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(201));wc.hbrBackground=uiBgBrush; wc.hCursor=LoadCursorW(NULL,IDC_ARROW); RegisterClassW(&wc);
-    window=CreateWindowExW(0,wc.lpszClassName,L"Запись экрана 3.0 — новый интерфейс",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX|WS_HSCROLL|WS_VSCROLL,CW_USEDEFAULT,CW_USEDEFAULT,1040,800,NULL,NULL,instance,NULL);
+    window=CreateWindowExW(0,wc.lpszClassName,L"Запись экрана 3.0.1 — новый интерфейс",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX|WS_HSCROLL|WS_VSCROLL,CW_USEDEFAULT,CW_USEDEFAULT,1040,800,NULL,NULL,instance,NULL);
     uiFontButton=uiAdd(L"Шрифт",890,14,100,32,7,L"BUTTON",WS_TABSTOP);
     sourceBox=CreateWindowExW(0,L"COMBOBOX",L"",WS_CHILD|CBS_DROPDOWNLIST,0,0,1,1,window,NULL,instance,NULL);
     const wchar_t *sources[]={L"Область",L"Основной монитор",L"Все мониторы",L"Окно"};for(int i=0;i<4;i++)SendMessageW(sourceBox,CB_ADDSTRING,0,(LPARAM)sources[i]);SendMessageW(sourceBox,CB_SETCURSEL,0,0);
