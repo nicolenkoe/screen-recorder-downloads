@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include "audio.h"
 #include "wav.h"
+#include "samples.h"
 
 UINT64 audio_clock(void) {
     LARGE_INTEGER n,f; QueryPerformanceCounter(&n); QueryPerformanceFrequency(&f);
@@ -17,6 +18,7 @@ static DWORD WINAPI capture(LPVOID ctx) {
     IMMDeviceEnumerator *devices=NULL; IMMDevice *device=NULL;
     IAudioClient *client=NULL; IAudioCaptureClient *capture=NULL;
     WAVEFORMATEX *format=NULL; Wave wave={0}; FILE *file=NULL;
+    BYTE *scaled=NULL;size_t scaledCapacity=0;
     int com=0,started=0; HRESULT hr=CoInitializeEx(NULL,COINIT_MULTITHREADED);
     if(FAILED(hr)) goto cleanup; com=1;
     hr=CoCreateInstance(&CLSID_MMDeviceEnumerator,NULL,CLSCTX_ALL,&IID_IMMDeviceEnumerator,(void**)&devices);
@@ -67,7 +69,14 @@ static DWORD WINAPI capture(LPVOID ctx) {
             UINT64 count=frames-skip;
             if(written>=maxFrames) count=0;
             else if(count>maxFrames-written) count=maxFrames-written;
-            if(ok && count) ok=wav_samples(&wave,(flags&AUDCLNT_BUFFERFLAGS_SILENT)?NULL:bytes+(size_t)skip*format->nBlockAlign,count);
+            if(ok && count){const BYTE *samples=(flags&AUDCLNT_BUFFERFLAGS_SILENT)?NULL:bytes+(size_t)skip*format->nBlockAlign;
+                if(!a->loopback && samples){size_t needed=(size_t)count*format->nBlockAlign;if(needed>scaledCapacity){if(scaled)HeapFree(GetProcessHeap(),0,scaled);scaled=HeapAlloc(GetProcessHeap(),0,needed);scaledCapacity=needed;}
+                    if(!scaled){hr=E_OUTOFMEMORY;IAudioCaptureClient_ReleaseBuffer(capture,frames);goto cleanup;}memcpy(scaled,samples,needed);
+                    int floating=format->wFormatTag==WAVE_FORMAT_IEEE_FLOAT||(format->wFormatTag==WAVE_FORMAT_EXTENSIBLE&&((WAVEFORMATEXTENSIBLE*)format)->SubFormat.Data1==WAVE_FORMAT_IEEE_FLOAT);
+                    InterlockedExchange(&a->level,scale_microphone(scaled,(unsigned int)count,format->nChannels,format->wBitsPerSample,floating,(int)a->gain));samples=scaled;
+                }else if(!a->loopback)InterlockedExchange(&a->level,0);
+                ok=wav_samples(&wave,samples,count);
+            }
             written+=count;
             HRESULT released=IAudioCaptureClient_ReleaseBuffer(capture,frames);
             if(!ok) { hr=HRESULT_FROM_WIN32(ERROR_WRITE_FAULT); goto cleanup; }
@@ -87,6 +96,7 @@ static DWORD WINAPI capture(LPVOID ctx) {
         WaitForSingleObject(a->stop,10);
     }
 cleanup:
+    if(scaled)HeapFree(GetProcessHeap(),0,scaled);
     if(started) IAudioClient_Stop(client);
     if(wave.f) { if(!wav_close(&wave) && SUCCEEDED(hr)) hr=HRESULT_FROM_WIN32(ERROR_WRITE_FAULT); file=NULL; }
     if(file) fclose(file);
@@ -101,7 +111,7 @@ cleanup:
     return 0;
 }
 int audio_prepare(AudioTrack *a,int loopback,const wchar_t *path) {
-    ZeroMemory(a,sizeof(*a)); a->loopback=loopback; wcscpy(a->path,path);
+    ZeroMemory(a,sizeof(*a)); a->gain=100;a->loopback=loopback; wcscpy(a->path,path);
     a->ready=CreateEventW(NULL,TRUE,FALSE,NULL); a->go=CreateEventW(NULL,TRUE,FALSE,NULL); a->stop=CreateEventW(NULL,TRUE,FALSE,NULL);
     if(!a->ready || !a->go || !a->stop) { a->error=E_OUTOFMEMORY; return 0; }
     a->thread=CreateThread(NULL,0,capture,a,0,NULL);

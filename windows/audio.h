@@ -5,6 +5,7 @@ typedef struct {
     HANDLE thread,ready,go,stop;
     int loopback;
     volatile LONG error;
+    volatile LONG gain,level;
     wchar_t path[4096];
     UINT64 start100ns,end100ns;
 } AudioTrack;

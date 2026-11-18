@@ -48,14 +48,14 @@ jobs:
       - run: bash scripts/build-windows.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-2.1
-          path: build/windows/ScreenRecorder-Windows-2.1.exe
+          name: windows-3.0
+          path: build/windows/ScreenRecorder-Windows-3.0.exe
       - name: Publish Windows download
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view windows-2.1 >/dev/null 2>&1; then
-            gh release upload windows-2.1 build/windows/ScreenRecorder-Windows-2.1.exe --clobber
+          if gh release view windows-3.0 >/dev/null 2>&1; then
+            gh release upload windows-3.0 build/windows/ScreenRecorder-Windows-3.0.exe --clobber
           else
-            gh release create windows-2.1 build/windows/ScreenRecorder-Windows-2.1.exe --title "Windows 2.1" --notes "Current Windows version: screen-region recording, microphone and system sound. New gallery and redesigned UI are not included yet."
+            gh release create windows-3.0 build/windows/ScreenRecorder-Windows-3.0.exe --title "Windows 3.0" --notes "New dark/mint interface, font menu, capture modes, microphone gain, gallery preview and non-destructive trimming. Multi-window composition is not implemented; its button is disabled."
           fi
