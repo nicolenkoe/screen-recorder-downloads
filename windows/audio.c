@@ -70,11 +70,11 @@ static DWORD WINAPI capture(LPVOID ctx) {
             if(written>=maxFrames) count=0;
             else if(count>maxFrames-written) count=maxFrames-written;
             if(ok && count){const BYTE *samples=(flags&AUDCLNT_BUFFERFLAGS_SILENT)?NULL:bytes+(size_t)skip*format->nBlockAlign;
-                if(!a->loopback && samples){size_t needed=(size_t)count*format->nBlockAlign;if(needed>scaledCapacity){if(scaled)HeapFree(GetProcessHeap(),0,scaled);scaled=HeapAlloc(GetProcessHeap(),0,needed);scaledCapacity=needed;}
+                if(samples){size_t needed=(size_t)count*format->nBlockAlign;if(needed>scaledCapacity){if(scaled)HeapFree(GetProcessHeap(),0,scaled);scaled=HeapAlloc(GetProcessHeap(),0,needed);scaledCapacity=needed;}
                     if(!scaled){hr=E_OUTOFMEMORY;IAudioCaptureClient_ReleaseBuffer(capture,frames);goto cleanup;}memcpy(scaled,samples,needed);
                     int floating=format->wFormatTag==WAVE_FORMAT_IEEE_FLOAT||(format->wFormatTag==WAVE_FORMAT_EXTENSIBLE&&((WAVEFORMATEXTENSIBLE*)format)->SubFormat.Data1==WAVE_FORMAT_IEEE_FLOAT);
-                    InterlockedExchange(&a->level,scale_microphone(scaled,(unsigned int)count,format->nChannels,format->wBitsPerSample,floating,(int)a->gain));samples=scaled;
-                }else if(!a->loopback)InterlockedExchange(&a->level,0);
+                    InterlockedExchange(&a->level,scale_microphone(scaled,(unsigned int)count,format->nChannels,format->wBitsPerSample,floating,(int)InterlockedCompareExchange(&a->gain,0,0)));samples=scaled;
+                }else InterlockedExchange(&a->level,0);
                 ok=wav_samples(&wave,samples,count);
             }
             written+=count;

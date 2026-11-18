@@ -10,8 +10,8 @@
 #define UI_LINE RGB(60,80,93)
 static HFONT uiFont,uiTitleFont,uiSmallFont,uiTimerFont;
 static HBRUSH uiBgBrush,uiSurfaceBrush;
-static int uiScale=100,uiDpi=96,uiScrollX=0,uiScrollY=0,uiReady=0,uiLayoutBusy=0,uiIdle=1,uiGain=100;
-static HWND uiFontButton,uiGainSlider,uiGainLabel,uiMode[5],uiSubtitle;
+static int uiScale=100,uiDpi=96,uiScrollX=0,uiScrollY=0,uiReady=0,uiLayoutBusy=0,uiIdle=1,uiGain=100,uiSystemGain=100;
+static HWND uiFontButton,uiGainSlider,uiGainLabel,uiSystemGainSlider,uiSystemGainLabel,uiMode[5],uiSubtitle;
 static HWND uiDot;static int uiDotAttempted=0;
 static WNDPROC uiOldButton;
 typedef struct{HWND w;int x,y,width,height,small;}UiControl;
@@ -19,8 +19,8 @@ static UiControl uiItems[64];static int uiCount;
 static int U(int value){return MulDiv(value,uiScale*uiDpi,9600);}
 static int D(int value){return MulDiv(value,uiDpi,96);}
 static void uiReadSettings(void){DWORD type=0,size=4,value=100;HKEY key;
- if(RegOpenKeyExW(HKEY_CURRENT_USER,L"Software\\ScreenRecorder",0,KEY_READ,&key)==ERROR_SUCCESS){if(RegQueryValueExW(key,L"FontPercent",NULL,&type,(BYTE*)&value,&size)==ERROR_SUCCESS&&type==REG_DWORD&&(value==100||value==125||value==150||value==175||value==200))uiScale=value;size=4;value=100;if(RegQueryValueExW(key,L"MicGain",NULL,&type,(BYTE*)&value,&size)==ERROR_SUCCESS&&value<=100)uiGain=value;RegCloseKey(key);}}
-static void uiSaveSettings(void){HKEY key;if(RegCreateKeyExW(HKEY_CURRENT_USER,L"Software\\ScreenRecorder",0,NULL,0,KEY_WRITE,NULL,&key,NULL)==ERROR_SUCCESS){DWORD s=uiScale,g=uiGain;RegSetValueExW(key,L"FontPercent",0,REG_DWORD,(BYTE*)&s,4);RegSetValueExW(key,L"MicGain",0,REG_DWORD,(BYTE*)&g,4);RegCloseKey(key);}}
+ if(RegOpenKeyExW(HKEY_CURRENT_USER,L"Software\\ScreenRecorder",0,KEY_READ,&key)==ERROR_SUCCESS){if(RegQueryValueExW(key,L"FontPercent",NULL,&type,(BYTE*)&value,&size)==ERROR_SUCCESS&&type==REG_DWORD&&(value==100||value==125||value==150||value==175||value==200))uiScale=value;size=4;value=100;if(RegQueryValueExW(key,L"MicGain",NULL,&type,(BYTE*)&value,&size)==ERROR_SUCCESS&&value<=100)uiGain=value;size=4;value=100;if(RegQueryValueExW(key,L"SystemGain",NULL,&type,(BYTE*)&value,&size)==ERROR_SUCCESS&&type==REG_DWORD&&value<=100)uiSystemGain=value;RegCloseKey(key);}}
+static void uiSaveSettings(void){HKEY key;if(RegCreateKeyExW(HKEY_CURRENT_USER,L"Software\\ScreenRecorder",0,NULL,0,KEY_WRITE,NULL,&key,NULL)==ERROR_SUCCESS){DWORD s=uiScale,g=uiGain,sys=uiSystemGain;RegSetValueExW(key,L"FontPercent",0,REG_DWORD,(BYTE*)&s,4);RegSetValueExW(key,L"MicGain",0,REG_DWORD,(BYTE*)&g,4);RegSetValueExW(key,L"SystemGain",0,REG_DWORD,(BYTE*)&sys,4);RegCloseKey(key);}}
 static LRESULT CALLBACK uiButtonProc(HWND w,UINT msg,WPARAM wp,LPARAM lp,UINT_PTR id,DWORD_PTR ref){
  if(GetPropW(w,L"RecorderCheck")){if(msg==BM_GETCHECK)return GetPropW(w,L"RecorderChecked")?BST_CHECKED:BST_UNCHECKED;if(msg==BM_SETCHECK){if(wp==BST_CHECKED)SetPropW(w,L"RecorderChecked",(HANDLE)1);else RemovePropW(w,L"RecorderChecked");InvalidateRect(w,NULL,FALSE);return 0;}}
  return DefSubclassProc(w,msg,wp,lp);
@@ -50,32 +50,78 @@ static void uiFonts(void){HFONT old[]={uiFont,uiTitleFont,uiSmallFont,uiTimerFon
  for(int i=0;i<4;i++)if(old[i])DeleteObject(old[i]);
 }
 static void uiLayout(int resize){if(!uiReady||uiLayoutBusy)return;uiLayoutBusy=1;
- if(resize){MONITORINFO monitor={sizeof(monitor)};GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor);RECT bounds={0,0,U(1020),U(746)};AdjustWindowRectEx(&bounds,(DWORD)GetWindowLongPtrW(window,GWL_STYLE),FALSE,0);int w=min(bounds.right-bounds.left,monitor.rcWork.right-monitor.rcWork.left-D(24)),h=min(bounds.bottom-bounds.top,monitor.rcWork.bottom-monitor.rcWork.top-D(24));RECT old;GetWindowRect(window,&old);int x=max(monitor.rcWork.left,min(old.left,monitor.rcWork.right-w)),y=max(monitor.rcWork.top,min(old.top,monitor.rcWork.bottom-h));SetWindowPos(window,NULL,x,y,w,h,SWP_NOZORDER|SWP_NOACTIVATE);RECT available;GetClientRect(window,&available);int addW=max(0,U(1020)-available.right),addH=max(0,U(746)-available.bottom);if(addW||addH){w=min(w+addW,monitor.rcWork.right-monitor.rcWork.left-D(24));h=min(h+addH,monitor.rcWork.bottom-monitor.rcWork.top-D(24));SetWindowPos(window,NULL,x,y,w,h,SWP_NOZORDER|SWP_NOACTIVATE);}}
- RECT client;GetClientRect(window,&client);SCROLLINFO si={sizeof(si),SIF_RANGE|SIF_PAGE|SIF_POS};si.nMin=0;si.nMax=U(1020)-1;si.nPage=client.right;si.nPos=uiScrollX;SetScrollInfo(window,SB_HORZ,&si,TRUE);si.nMax=U(746)-1;si.nPage=client.bottom;si.nPos=uiScrollY;SetScrollInfo(window,SB_VERT,&si,TRUE);uiScrollX=GetScrollPos(window,SB_HORZ);uiScrollY=GetScrollPos(window,SB_VERT);GetClientRect(window,&client);
+ if(resize){MONITORINFO monitor={sizeof(monitor)};GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor);RECT bounds={0,0,U(1020),U(796)};AdjustWindowRectEx(&bounds,(DWORD)GetWindowLongPtrW(window,GWL_STYLE),FALSE,0);int w=min(bounds.right-bounds.left,monitor.rcWork.right-monitor.rcWork.left-D(24)),h=min(bounds.bottom-bounds.top,monitor.rcWork.bottom-monitor.rcWork.top-D(24));RECT old;GetWindowRect(window,&old);int x=max(monitor.rcWork.left,min(old.left,monitor.rcWork.right-w)),y=max(monitor.rcWork.top,min(old.top,monitor.rcWork.bottom-h));SetWindowPos(window,NULL,x,y,w,h,SWP_NOZORDER|SWP_NOACTIVATE);RECT available;GetClientRect(window,&available);int addW=max(0,U(1020)-available.right),addH=max(0,U(796)-available.bottom);if(addW||addH){w=min(w+addW,monitor.rcWork.right-monitor.rcWork.left-D(24));h=min(h+addH,monitor.rcWork.bottom-monitor.rcWork.top-D(24));SetWindowPos(window,NULL,x,y,w,h,SWP_NOZORDER|SWP_NOACTIVATE);}}
+ RECT client;GetClientRect(window,&client);SCROLLINFO si={sizeof(si),SIF_RANGE|SIF_PAGE|SIF_POS};si.nMin=0;si.nMax=U(1020)-1;si.nPage=client.right;si.nPos=uiScrollX;SetScrollInfo(window,SB_HORZ,&si,TRUE);si.nMax=U(796)-1;si.nPage=client.bottom;si.nPos=uiScrollY;SetScrollInfo(window,SB_VERT,&si,TRUE);uiScrollX=GetScrollPos(window,SB_HORZ);uiScrollY=GetScrollPos(window,SB_VERT);GetClientRect(window,&client);
  for(int i=0;i<uiCount;i++){UiControl c=uiItems[i];int x=U(c.x)-uiScrollX,y=U(c.y)-uiScrollY,w=U(c.width),h=U(c.height);if(c.w==uiFontButton){x=client.right-D(112);y=D(14);w=D(96);h=D(32);}MoveWindow(c.w,x,y,w,h,TRUE);}
  InvalidateRect(window,NULL,TRUE);uiLayoutBusy=0;
 }
 static void uiText(HDC dc,const wchar_t *text,int x,int y,int w,int h,HFONT font,COLORREF color,UINT flags){RECT r={U(x)-uiScrollX,U(y)-uiScrollY,U(x+w)-uiScrollX,U(y+h)-uiScrollY};SetBkMode(dc,TRANSPARENT);SetTextColor(dc,color);HGDIOBJ old=SelectObject(dc,font);DrawTextW(dc,text,-1,&r,flags);SelectObject(dc,old);}
+/* Native, animated explanations of each capture mode. Coordinates follow interface scaling. */
+static int uiDiagramMode=-1;
+static void uiShape(HDC dc,int x,int y,int w,int h,COLORREF fill,COLORREF edge,int thickness){
+ HBRUSH b=CreateSolidBrush(fill);HPEN p=CreatePen(PS_SOLID,max(1,U(thickness)),edge);HGDIOBJ ob=SelectObject(dc,b),op=SelectObject(dc,p);
+ RoundRect(dc,U(x)-uiScrollX,U(y)-uiScrollY,U(x+w)-uiScrollX,U(y+h)-uiScrollY,U(8),U(8));SelectObject(dc,ob);SelectObject(dc,op);DeleteObject(b);DeleteObject(p);
+}
+static void uiDiagramText(HDC dc,const wchar_t *text,int x,int y,int w,int h,COLORREF color){
+ uiText(dc,text,x,y,w,h,uiFont,color,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+}
+static void uiMonitor(HDC dc,int x,int y,int w,int h,int selected,const wchar_t *label){
+ uiShape(dc,x,y,w,h,UI_BG,selected?UI_MINT:UI_MUTED,selected?3:2);
+ uiShape(dc,x+7,y+7,w-14,h-24,selected?RGB(30,69,57):UI_SURFACE,UI_LINE,1);
+ uiShape(dc,x+w/2-5,y+h,10,12,UI_MUTED,UI_MUTED,1);
+ uiShape(dc,x+w/2-37,y+h+12,74,5,UI_MUTED,UI_MUTED,1);
+ if(label)uiDiagramText(dc,label,x+10,y+30,w-20,h-55,UI_TEXT);
+}
+static void uiExampleWindow(HDC dc,int x,int y,int w,int h,int chosen,const wchar_t *label){
+ uiShape(dc,x,y,w,h,chosen?RGB(36,81,66):RGB(39,51,63),chosen?UI_MINT:UI_LINE,chosen?3:1);
+ uiShape(dc,x+5,y+5,w-10,16,chosen?RGB(59,126,100):RGB(58,72,85),chosen?UI_MINT:UI_LINE,1);
+ if(label)uiDiagramText(dc,label,x+7,y+25,w-14,h-30,chosen?UI_TEXT:UI_MUTED);
+}
+static void uiDemoCursor(HDC dc,int x,int y){
+ POINT points[]={{U(x)-uiScrollX,U(y)-uiScrollY},{U(x)-uiScrollX,U(y+23)-uiScrollY},{U(x+6)-uiScrollX,U(y+17)-uiScrollY},{U(x+13)-uiScrollX,U(y+29)-uiScrollY},{U(x+18)-uiScrollX,U(y+26)-uiScrollY},{U(x+11)-uiScrollX,U(y+15)-uiScrollY},{U(x+22)-uiScrollX,U(y+15)-uiScrollY}};
+ HBRUSH b=CreateSolidBrush(UI_TEXT);HPEN p=CreatePen(PS_SOLID,1,UI_BG);HGDIOBJ ob=SelectObject(dc,b),op=SelectObject(dc,p);Polygon(dc,points,7);SelectObject(dc,ob);SelectObject(dc,op);DeleteObject(b);DeleteObject(p);
+}
+static void uiCaptureDiagram(HDC dc,int mode){
+ const wchar_t *titles[]={L"Запишется выделенная часть",L"Запишется весь этот монитор",L"Общий рабочий стол двух мониторов",L"Запишется одно выбранное окно",L"Схема режима · пока недоступно"};
+ uiDiagramText(dc,titles[mode],50,266,520,30,mode==4?RGB(243,185,107):UI_MUTED);
+ if(mode==2){uiMonitor(dc,63,321,235,137,1,L"Монитор 1");uiMonitor(dc,319,321,235,137,1,L"Монитор 2");return;}
+ uiMonitor(dc,104,307,410,151,mode==1,NULL);
+ if(mode==0){
+  uiExampleWindow(dc,123,326,139,73,0,NULL);uiExampleWindow(dc,270,338,219,87,0,NULL);
+  double phase=(GetTickCount64()%5000)/5000.0,progress=phase<.16?0:phase<.72?(phase-.16)/.56:1;
+  int w=60+(int)(190*progress),h=35+(int)(57*progress),x=167,y=336;
+  uiShape(dc,x,y,w,h,RGB(39,95,73),UI_MINT,3);
+  uiShape(dc,x+w-4,y+h-4,8,8,UI_TEXT,UI_MINT,1);uiDemoCursor(dc,x+w,y+h);
+ }else if(mode==1){
+  uiExampleWindow(dc,122,325,142,75,0,NULL);uiExampleWindow(dc,278,338,216,89,0,NULL);
+  uiShape(dc,111,314,396,127,RGB(31,74,59),UI_MINT,3);uiDiagramText(dc,L"Весь экран",120,346,376,55,UI_TEXT);
+ }else{
+  uiExampleWindow(dc,120,321,168,84,mode==4,mode==4?L"Окно 1":L"Другое окно");
+  uiExampleWindow(dc,290,348,205,86,1,mode==4?L"Окно 2":L"Выбранное окно");uiDemoCursor(dc,424,350);
+ }
+}
+static void uiAnimateDiagram(void){if(uiIdle){RECT r={U(50)-uiScrollX,U(265)-uiScrollY,U(575)-uiScrollX,U(487)-uiScrollY};InvalidateRect(window,&r,FALSE);}}
+
 static void uiPaint(void){PAINTSTRUCT paint;HDC dc=BeginPaint(window,&paint);RECT r;GetClientRect(window,&r);FillRect(dc,&r,uiBgBrush);
- uiText(dc,L"Запись экрана 3.0",90,20,650,36,uiFont,UI_TEXT,DT_LEFT|DT_VCENTER|DT_SINGLELINE);
+ uiText(dc,L"Запись экрана 3.0.2",90,20,650,36,uiFont,UI_TEXT,DT_LEFT|DT_VCENTER|DT_SINGLELINE);
  int lx=U(28)-uiScrollX,ly=U(16)-uiScrollY;HPEN pen=CreatePen(PS_SOLID,U(4),UI_MINT);HGDIOBJ op=SelectObject(dc,pen),ob=SelectObject(dc,GetStockObject(NULL_BRUSH));RoundRect(dc,lx+U(21),ly+U(4),lx+U(57),ly+U(36),U(6),U(6));MoveToEx(dc,lx+U(41),ly+U(36),NULL);LineTo(dc,lx+U(41),ly+U(44));MoveToEx(dc,lx+U(29),ly+U(44),NULL);LineTo(dc,lx+U(53),ly+U(44));SelectObject(dc,op);DeleteObject(pen);pen=CreatePen(PS_SOLID,U(4),UI_TEXT);SelectObject(dc,pen);RoundRect(dc,lx+U(4),ly+U(19),lx+U(29),ly+U(55),U(7),U(7));HBRUSH red=CreateSolidBrush(RGB(255,38,62));SelectObject(dc,red);Ellipse(dc,lx+U(11),ly+U(30),lx+U(23),ly+U(42));SelectObject(dc,op);SelectObject(dc,ob);DeleteObject(pen);DeleteObject(red);
  uiText(dc,L"Запишите то, что важно",30,85,950,46,uiTitleFont,UI_TEXT,DT_LEFT|DT_VCENTER|DT_SINGLELINE);
  uiText(dc,L"Выберите режим захвата и источники звука.",30,137,950,34,uiFont,UI_MUTED,DT_LEFT|DT_VCENTER|DT_SINGLELINE);
- pen=CreatePen(PS_SOLID,1,UI_LINE);op=SelectObject(dc,pen);MoveToEx(dc,U(30)-uiScrollX,U(245)-uiScrollY,NULL);LineTo(dc,U(990)-uiScrollX,U(245)-uiScrollY);MoveToEx(dc,U(600)-uiScrollX,U(265)-uiScrollY,NULL);LineTo(dc,U(600)-uiScrollX,U(505)-uiScrollY);SelectObject(dc,op);DeleteObject(pen);
- int x=U(65)-uiScrollX,y=U(275)-uiScrollY,w=U(480),h=U(150);pen=CreatePen(PS_DASH,max(1,U(2)),UI_MINT);op=SelectObject(dc,pen);ob=SelectObject(dc,GetStockObject(NULL_BRUSH));RoundRect(dc,x,y,x+w,y+h,U(18),U(18));SelectObject(dc,op);SelectObject(dc,ob);DeleteObject(pen);
- int mode=(int)SendMessageW(sourceBox,CB_GETCURSEL,0,0);const wchar_t *caption=mode==0?L"Область экрана":mode==3?L"Окно приложения":mode==2?L"Все мониторы":L"Весь экран";
- uiText(dc,caption,90,320,430,40,uiTimerFont,UI_TEXT,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
- uiText(dc,mode==0?L"После нажатия выделите область мышью.":mode==3?L"После нажатия выберите нужное окно.":L"Запись начнётся после нажатия кнопки.",50,450,520,56,uiFont,UI_MUTED,DT_CENTER|DT_WORDBREAK);
- uiText(dc,L"Качество",625,441,125,40,uiFont,UI_MUTED,DT_LEFT|DT_VCENTER|DT_SINGLELINE);
+ pen=CreatePen(PS_SOLID,1,UI_LINE);op=SelectObject(dc,pen);MoveToEx(dc,U(30)-uiScrollX,U(245)-uiScrollY,NULL);LineTo(dc,U(990)-uiScrollX,U(245)-uiScrollY);MoveToEx(dc,U(600)-uiScrollX,U(265)-uiScrollY,NULL);LineTo(dc,U(600)-uiScrollX,U(555)-uiScrollY);SelectObject(dc,op);DeleteObject(pen);
+ int mode=uiDiagramMode==4?4:(int)SendMessageW(sourceBox,CB_GETCURSEL,0,0);if(mode<0||mode>4)mode=0;
+ uiCaptureDiagram(dc,mode);
+ const wchar_t *tips[]={L"Зажмите кнопку мыши → протяните рамку → отпустите.",L"В запись попадёт всё, что видно на этом мониторе.",L"Оба монитора будут записаны в одно видео.",L"После «Захватить экран» выберите окно из списка.",L"Два отдельных окна. Запись этого режима пока недоступна."};
+ uiText(dc,tips[mode],50,490,520,66,uiFont,UI_MUTED,DT_CENTER|DT_WORDBREAK);
+ uiText(dc,L"Качество",625,491,125,40,uiFont,UI_MUTED,DT_LEFT|DT_VCENTER|DT_SINGLELINE);
  uiText(dc,L"Уровень микрофона",625,353,350,28,uiSmallFont,UI_MUTED,DT_LEFT|DT_SINGLELINE);
  int meter=mic.loopback?0:(int)mic.level;RECT bar={U(625)-uiScrollX,U(380)-uiScrollY,U(978)-uiScrollX,U(387)-uiScrollY};FillRect(dc,&bar,uiSurfaceBrush);bar.right=bar.left+U(353)*max(0,min(meter,100))/100;HBRUSH mintBrush=CreateSolidBrush(UI_MINT);FillRect(dc,&bar,mintBrush);DeleteObject(mintBrush);
- uiText(dc,L"Ctrl + Shift + F12 — остановить запись",30,573,950,23,uiSmallFont,UI_MUTED,DT_LEFT|DT_SINGLELINE);
+ uiText(dc,L"Ctrl + Shift + F12 — остановить запись",30,623,950,23,uiSmallFont,UI_MUTED,DT_LEFT|DT_SINGLELINE);
  EndPaint(window,&paint);
 }
 static int uiDrawItem(DRAWITEMSTRUCT *draw){HDC dc=draw->hDC;RECT r=draw->rcItem;wchar_t text[256]=L"";SetBkMode(dc,TRANSPARENT);SelectObject(dc,uiFont);COLORREF fill=UI_SURFACE,ink=UI_TEXT;int id=draw->CtlID;
  if(draw->CtlType==ODT_COMBOBOX){if(draw->itemID==(UINT)-1)GetWindowTextW(draw->hwndItem,text,256);else SendMessageW(draw->hwndItem,CB_GETLBTEXT,draw->itemID,(LPARAM)text);HBRUSH b=CreateSolidBrush(draw->itemState&ODS_SELECTED?UI_LINE:UI_SURFACE);FillRect(dc,&r,b);DeleteObject(b);SetTextColor(dc,UI_TEXT);r.left+=U(12);DrawTextW(dc,text,-1,&r,DT_LEFT|DT_VCENTER|DT_SINGLELINE);return 1;}
  if(draw->CtlType!=ODT_BUTTON)return 0;
- FillRect(dc,&r,uiBgBrush);GetWindowTextW(draw->hwndItem,text,256);int source=(int)SendMessageW(sourceBox,CB_GETCURSEL,0,0);int modeMap[]={0,3,1,2};int active=(id>=20&&id<=23&&source==modeMap[id-20]);
+ FillRect(dc,&r,uiBgBrush);GetWindowTextW(draw->hwndItem,text,256);int source=(int)SendMessageW(sourceBox,CB_GETCURSEL,0,0);int modeMap[]={0,3,1,2};int active=uiDiagramMode==4?id==24:(id>=20&&id<=23&&source==modeMap[id-20]);
  if(id==1||id==104||active){fill=UI_MINT;ink=UI_BG;}if(draw->itemState&ODS_DISABLED){fill=RGB(28,40,49);ink=RGB(104,125,138);}if(draw->itemState&ODS_SELECTED){fill=id==1||active?RGB(74,191,149):UI_LINE;}
  HBRUSH b=CreateSolidBrush(id==7?UI_BG:fill);HPEN p=CreatePen(PS_SOLID,1,id==7?UI_BG:(active||id==1?fill:UI_LINE));HGDIOBJ ob=SelectObject(dc,b),op=SelectObject(dc,p);RoundRect(dc,r.left+1,r.top+1,r.right-1,r.bottom-1,U(14),U(14));SelectObject(dc,ob);SelectObject(dc,op);DeleteObject(b);DeleteObject(p);
  SetTextColor(dc,ink);if(id==7)SelectObject(dc,uiSmallFont);

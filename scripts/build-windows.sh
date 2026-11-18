@@ -20,4 +20,4 @@ PY
 python3 -m pip install --target build/zig ziglang==0.13.0
 export ZIG_GLOBAL_CACHE_DIR="$PWD/build/zig-global" ZIG_LOCAL_CACHE_DIR="$PWD/build/zig-local"
 build/zig/ziglang/zig rc /fo build/windows/bundle.res -- build/windows/bundle.rc
-build/zig/ziglang/zig cc -target x86_64-windows-gnu -Os -Wall -Wextra -Wno-unused-parameter -municode -Wl,--subsystem,windows windows/recorder.c windows/audio.c windows/region.c build/windows/bundle.res -o build/windows/ScreenRecorder-Windows-3.0.1.exe -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomdlg32 -lcomctl32 -lmfplay -lmfplat -lmfuuid -lpropsys -lole32 -ladvapi32 -luuid
+build/zig/ziglang/zig cc -target x86_64-windows-gnu -Os -Wall -Wextra -Wno-unused-parameter -municode -Wl,--subsystem,windows windows/recorder.c windows/audio.c windows/region.c build/windows/bundle.res -o build/windows/ScreenRecorder-Windows-3.0.2.exe -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomdlg32 -lcomctl32 -lmfplay -lmfplat -lmfuuid -lpropsys -lole32 -ladvapi32 -luuid

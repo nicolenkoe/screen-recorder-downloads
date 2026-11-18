@@ -34,9 +34,10 @@ static const wchar_t singleFilter[]=L"[1:a]aresample=48000:async=1:first_pts=0,a
 #include "gallery.h"
 static void status(const wchar_t *s) { SetWindowTextW(statusLabel,s); }
 static void controls(int idle) {
-    uiIdle=idle;for(int i=0;i<4;i++)if(uiMode[i])EnableWindow(uiMode[i],idle);
+    uiIdle=idle;for(int i=0;i<5;i++)if(uiMode[i])EnableWindow(uiMode[i],idle);
     if(uiGainSlider)EnableWindow(uiGainSlider,SendMessageW(micBox,BM_GETCHECK,0,0)==BST_CHECKED);
-    EnableWindow(startButton,idle); EnableWindow(sourceBox,idle); EnableWindow(fpsBox,idle);
+    if(uiSystemGainSlider)EnableWindow(uiSystemGainSlider,SendMessageW(systemBox,BM_GETCHECK,0,0)==BST_CHECKED);
+    EnableWindow(startButton,idle&&uiDiagramMode!=4); EnableWindow(sourceBox,idle); EnableWindow(fpsBox,idle);
     EnableWindow(micBox,idle); EnableWindow(systemBox,idle);
     EnableWindow(stopButton,!idle && (child || finalizing));
     SetWindowTextW(stopButton,(stopping || muxing || finalizing)?L"Отменить сохранение":L"■ Остановить");
@@ -157,6 +158,7 @@ static void beginRecording(void) {
         recordingFailed=1;stopAudio();finalizing=1;controls(0);return;
     }
     InterlockedExchange(&mic.gain,uiGain);
+    InterlockedExchange(&systemAudio.gain,uiSystemGain);
     wchar_t input[256];if(SendMessageW(sourceBox,CB_GETCURSEL,0,0)==3){if(!IsWindow(uiPickedWindow)||IsIconic(uiPickedWindow)){recordingFailed=1;stopAudio();finalizing=1;return;}swprintf(input,256,L"-i hwnd=0x%llx",(unsigned long long)(UINT_PTR)uiPickedWindow);}else swprintf(input,256,L"-offset_x %d -offset_y %d -video_size %dx%d -i desktop",x,y,w,h);
     int maxW[]={1280,1280,1920,1920},maxH[]={720,720,1080,1080},crf[]={28,28,23,23};
     wchar_t cmd[16000];
@@ -175,6 +177,7 @@ static void selected(int x,int y,int w,int h,int accepted) {
     countdown=1;status(L"Область выбрана. Запускаем запись…");SetTimer(window,2,250,NULL);
 }
 static void start(void) {
+    if(uiDiagramMode==4){status(L"Запись нескольких отдельных окон пока недоступна.");return;}
     if(child || countdown || selecting || finalizing || !audioFinished()) return;
     releaseAudio(); ZeroMemory(&mic,sizeof(mic)); ZeroMemory(&systemAudio,sizeof(systemAudio));
     if(!bundledFFmpeg()) return;
@@ -263,17 +266,19 @@ static LRESULT CALLBACK proc(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
     case WM_MOUSEWHEEL:uiScroll(0,GET_WHEEL_DELTA_WPARAM(wp)>0?SB_LINEUP:SB_LINEDOWN,0);return 0;
     case WM_HSCROLL:
         if((HWND)lp==uiGainSlider){uiGain=(int)SendMessageW(uiGainSlider,TBM_GETPOS,0,0);InterlockedExchange(&mic.gain,uiGain);wchar_t text[32];swprintf(text,32,L"%d%%",uiGain);SetWindowTextW(uiGainLabel,text);uiSaveSettings();return 0;}
+        if((HWND)lp==uiSystemGainSlider){uiSystemGain=(int)SendMessageW(uiSystemGainSlider,TBM_GETPOS,0,0);InterlockedExchange(&systemAudio.gain,uiSystemGain);wchar_t text[32];swprintf(text,32,L"%d%%",uiSystemGain);SetWindowTextW(uiSystemGainLabel,text);uiSaveSettings();return 0;}
         uiScroll(1,LOWORD(wp),HIWORD(wp));return 0;
     case WM_DPICHANGED:uiDpi=HIWORD(wp);uiFonts();uiLayout(1);return 0;
     case WM_COMMAND:
         if(LOWORD(wp)==7){uiScaleMenu();return 0;}
-        if(LOWORD(wp)>=20&&LOWORD(wp)<=23&&uiIdle){int map[]={0,3,1,2};SendMessageW(sourceBox,CB_SETCURSEL,map[LOWORD(wp)-20],0);for(int i=0;i<4;i++)InvalidateRect(uiMode[i],NULL,FALSE);InvalidateRect(window,NULL,FALSE);return 0;}
-        if(LOWORD(wp)==4||LOWORD(wp)==5){HWND toggle=LOWORD(wp)==4?micBox:systemBox;SendMessageW(toggle,BM_SETCHECK,SendMessageW(toggle,BM_GETCHECK,0,0)==BST_CHECKED?BST_UNCHECKED:BST_CHECKED,0);EnableWindow(uiGainSlider,SendMessageW(micBox,BM_GETCHECK,0,0)==BST_CHECKED);return 0;}
+        if(LOWORD(wp)==24&&uiIdle){uiDiagramMode=4;controls(1);status(L"Несколько отдельных окон: схема режима. Запись пока недоступна.");for(int i=0;i<5;i++)InvalidateRect(uiMode[i],NULL,FALSE);InvalidateRect(window,NULL,FALSE);return 0;}
+        if(LOWORD(wp)>=20&&LOWORD(wp)<=23&&uiIdle){uiDiagramMode=-1;int map[]={0,3,1,2};SendMessageW(sourceBox,CB_SETCURSEL,map[LOWORD(wp)-20],0);controls(1);status(L"Готово к записи. Выберите источники звука и нажмите «Захватить экран».");for(int i=0;i<5;i++)InvalidateRect(uiMode[i],NULL,FALSE);InvalidateRect(window,NULL,FALSE);return 0;}
+        if(LOWORD(wp)==4||LOWORD(wp)==5){HWND toggle=LOWORD(wp)==4?micBox:systemBox;SendMessageW(toggle,BM_SETCHECK,SendMessageW(toggle,BM_GETCHECK,0,0)==BST_CHECKED?BST_UNCHECKED:BST_CHECKED,0);EnableWindow(uiGainSlider,SendMessageW(micBox,BM_GETCHECK,0,0)==BST_CHECKED);EnableWindow(uiSystemGainSlider,SendMessageW(systemBox,BM_GETCHECK,0,0)==BST_CHECKED);return 0;}
         if(LOWORD(wp)==1) start(); if(LOWORD(wp)==2) stop();
         if(LOWORD(wp)==6) { ShellExecuteW(hwnd,L"open",L"explorer.exe",session[0]?session:appDir,NULL,SW_SHOWNORMAL); }
         if(LOWORD(wp)==3){if(bundledFFmpeg())galShow(output);return 0;}return 0;
     case WM_TIMER:
-        if(wp==2) { KillTimer(hwnd,2);countdown=0;beginRecording(); } else tick();return 0;
+        if(wp==2) { KillTimer(hwnd,2);countdown=0;beginRecording(); } else {uiAnimateDiagram();tick();}return 0;
     case WM_HOTKEY: if(wp==1)stop();return 0;
     case WM_CLOSE:
         if(finalizing || muxing || stopping) { abortSaving(1);return 0; }
@@ -295,22 +300,24 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE prev,PWSTR line,int show) {
     INITCOMMONCONTROLSEX common={sizeof(common),ICC_BAR_CLASSES};InitCommonControlsEx(&common);uiReadSettings();uiBgBrush=CreateSolidBrush(UI_BG);uiSurfaceBrush=CreateSolidBrush(UI_SURFACE);
     WNDCLASSW wc={0}; wc.lpfnWndProc=proc; wc.hInstance=instance; wc.lpszClassName=L"ScreenRecorderNative";
     wc.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(201));wc.hbrBackground=uiBgBrush; wc.hCursor=LoadCursorW(NULL,IDC_ARROW); RegisterClassW(&wc);
-    window=CreateWindowExW(0,wc.lpszClassName,L"Запись экрана 3.0.1 — новый интерфейс",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX|WS_HSCROLL|WS_VSCROLL,CW_USEDEFAULT,CW_USEDEFAULT,1040,800,NULL,NULL,instance,NULL);
-    uiFontButton=uiAdd(L"Шрифт",890,14,100,32,7,L"BUTTON",WS_TABSTOP);
+    window=CreateWindowExW(0,wc.lpszClassName,L"Запись экрана 3.0.2 — громкость двух источников",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX|WS_HSCROLL|WS_VSCROLL,CW_USEDEFAULT,CW_USEDEFAULT,1040,800,NULL,NULL,instance,NULL);
+    uiFontButton=uiAdd(L"Масштаб",890,14,100,32,7,L"BUTTON",WS_TABSTOP);
     sourceBox=CreateWindowExW(0,L"COMBOBOX",L"",WS_CHILD|CBS_DROPDOWNLIST,0,0,1,1,window,NULL,instance,NULL);
     const wchar_t *sources[]={L"Область",L"Основной монитор",L"Все мониторы",L"Окно"};for(int i=0;i<4;i++)SendMessageW(sourceBox,CB_ADDSTRING,0,(LPARAM)sources[i]);SendMessageW(sourceBox,CB_SETCURSEL,0,0);
-    const wchar_t *modes[]={L"Область",L"Окно",L"Весь экран",L"Все мониторы",L"Несколько окон"};for(int i=0;i<5;i++)uiMode[i]=uiAdd(modes[i],30+194*i,186,184,48,20+i,L"BUTTON",WS_TABSTOP);EnableWindow(uiMode[4],FALSE);
+    const wchar_t *modes[]={L"Область",L"Окно",L"Весь экран",L"Все мониторы",L"Несколько окон"};for(int i=0;i<5;i++)uiMode[i]=uiAdd(modes[i],30+194*i,186,184,48,20+i,L"BUTTON",WS_TABSTOP);
     micBox=uiAdd(L"Микрофон",625,264,355,42,4,L"BUTTON",BS_AUTOCHECKBOX|WS_TABSTOP);
     systemBox=uiAdd(L"Звук компьютера",625,398,355,42,5,L"BUTTON",BS_AUTOCHECKBOX|WS_TABSTOP);
     SendMessageW(micBox,BM_SETCHECK,BST_CHECKED,0);SendMessageW(systemBox,BM_SETCHECK,BST_CHECKED,0);
     uiGainSlider=uiAdd(L"",625,312,275,32,8,TRACKBAR_CLASSW,WS_TABSTOP|TBS_NOTICKS);SendMessageW(uiGainSlider,TBM_SETRANGE,TRUE,MAKELPARAM(0,100));SendMessageW(uiGainSlider,TBM_SETPOS,TRUE,uiGain);
     wchar_t gainText[32];swprintf(gainText,32,L"%d%%",uiGain);uiGainLabel=uiAdd(gainText,910,310,70,36,0,L"STATIC",SS_RIGHT|SS_CENTERIMAGE);
-    fpsBox=uiAdd(L"",751,443,230,180,9,L"COMBOBOX",CBS_DROPDOWNLIST|WS_TABSTOP);const wchar_t *qualities[]={L"720p · 15 к/с",L"720p · 24 к/с",L"1080p · 30 к/с",L"1080p · 60 к/с"};for(int i=0;i<4;i++)SendMessageW(fpsBox,CB_ADDSTRING,0,(LPARAM)qualities[i]);SendMessageW(fpsBox,CB_SETCURSEL,0,0);
-    statusLabel=uiAdd(L"Готово к записи. Выберите режим захвата.",30,522,760,48,0,L"STATIC",SS_LEFT);
-    timerLabel=uiAdd(L"00:00:00",804,522,178,44,0,L"STATIC",SS_RIGHT|SS_CENTERIMAGE);
-    startButton=uiAdd(L"Захватить экран",30,607,620,58,1,L"BUTTON",WS_TABSTOP);
-    stopButton=uiAdd(L"■ Остановить",670,607,320,58,2,L"BUTTON",WS_TABSTOP);
-    uiAdd(L"Галерея и обрезка",30,682,460,44,3,L"BUTTON",WS_TABSTOP);uiAdd(L"Открыть диагностику",510,682,480,44,6,L"BUTTON",WS_TABSTOP);
+    uiSystemGainSlider=uiAdd(L"",625,446,275,32,10,TRACKBAR_CLASSW,WS_TABSTOP|TBS_NOTICKS);SendMessageW(uiSystemGainSlider,TBM_SETRANGE,TRUE,MAKELPARAM(0,100));SendMessageW(uiSystemGainSlider,TBM_SETPOS,TRUE,uiSystemGain);
+    wchar_t systemGainText[32];swprintf(systemGainText,32,L"%d%%",uiSystemGain);uiSystemGainLabel=uiAdd(systemGainText,910,444,70,36,0,L"STATIC",SS_RIGHT|SS_CENTERIMAGE);
+    fpsBox=uiAdd(L"",751,493,230,180,9,L"COMBOBOX",CBS_DROPDOWNLIST|WS_TABSTOP);const wchar_t *qualities[]={L"720p · 15 к/с",L"720p · 24 к/с",L"1080p · 30 к/с",L"1080p · 60 к/с"};for(int i=0;i<4;i++)SendMessageW(fpsBox,CB_ADDSTRING,0,(LPARAM)qualities[i]);SendMessageW(fpsBox,CB_SETCURSEL,0,0);
+    statusLabel=uiAdd(L"Готово к записи. Выберите режим захвата.",30,572,760,48,0,L"STATIC",SS_LEFT);
+    timerLabel=uiAdd(L"00:00:00",804,572,178,44,0,L"STATIC",SS_RIGHT|SS_CENTERIMAGE);
+    startButton=uiAdd(L"Захватить экран",30,657,620,58,1,L"BUTTON",WS_TABSTOP);
+    stopButton=uiAdd(L"■ Остановить",670,657,320,58,2,L"BUTTON",WS_TABSTOP);
+    uiAdd(L"Галерея и обрезка",30,732,460,44,3,L"BUTTON",WS_TABSTOP);uiAdd(L"Открыть диагностику",510,732,480,44,6,L"BUTTON",WS_TABSTOP);
     uiReady=1;uiFonts();uiLayout(1);controls(1);RegisterHotKey(window,1,MOD_CONTROL|MOD_SHIFT|MOD_NOREPEAT,VK_F12);SetTimer(window,1,100,NULL);ShowWindow(window,show);UpdateWindow(window);
     MSG m;while(GetMessageW(&m,NULL,0,0)>0){if(!IsDialogMessageW(window,&m)){TranslateMessage(&m);DispatchMessageW(&m);}}
     if(mutex)CloseHandle(mutex);CoUninitialize();return 0;

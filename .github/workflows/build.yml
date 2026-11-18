@@ -45,17 +45,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify audio gain
+        run: gcc -std=c11 -Wall -Wextra tests/audio-gain.c -lm -o /tmp/audio-gain-test && /tmp/audio-gain-test
       - run: bash scripts/build-windows.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-3.0.1
-          path: build/windows/ScreenRecorder-Windows-3.0.1.exe
+          name: windows-3.0.2
+          path: build/windows/ScreenRecorder-Windows-3.0.2.exe
       - name: Publish Windows download
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view windows-3.0.1 >/dev/null 2>&1; then
-            gh release upload windows-3.0.1 build/windows/ScreenRecorder-Windows-3.0.1.exe --clobber
+          if gh release view windows-3.0.2 >/dev/null 2>&1; then
+            gh release upload windows-3.0.2 build/windows/ScreenRecorder-Windows-3.0.2.exe --clobber
           else
-            gh release create windows-3.0.1 build/windows/ScreenRecorder-Windows-3.0.1.exe --title "Windows 3.0.1" --notes "New dark/mint interface, font menu, capture modes, microphone gain, gallery preview and non-destructive trimming. Multi-window composition is not implemented; its button is disabled."
+            gh release create windows-3.0.2 build/windows/ScreenRecorder-Windows-3.0.2.exe --title "Windows 3.0.2" --notes "Independent microphone and computer audio gain sliders, persisted volume levels and compact Scale menu; gallery preview and non-destructive trimming. Capture modes have native visual explanations, including an animated area selector. Multiple-window capture is not implemented; its diagram can be viewed but recording is disabled."
           fi
