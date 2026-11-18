@@ -1,0 +1,200 @@
+[
+  {
+    "action": "mode-area selected",
+    "voiceTime": 8.05,
+    "actionTime": 8.591,
+    "delaySeconds": 0.541
+  },
+  {
+    "action": "mode-window selected",
+    "voiceTime": 16.9125,
+    "actionTime": 17.507,
+    "delaySeconds": 0.595
+  },
+  {
+    "action": "mode-screen selected",
+    "voiceTime": 26.862500000000004,
+    "actionTime": 27.484,
+    "delaySeconds": 0.621
+  },
+  {
+    "action": "mode-monitors selected",
+    "voiceTime": 34.4,
+    "actionTime": 35.031,
+    "delaySeconds": 0.631
+  },
+  {
+    "action": "mode-multi selected",
+    "voiceTime": 43.625,
+    "actionTime": 44.195,
+    "delaySeconds": 0.57
+  },
+  {
+    "action": "verified mic=1",
+    "spokenWord": "микрофон",
+    "voiceTime": 54.25,
+    "actionTime": 54.96,
+    "delaySeconds": 0.71
+  },
+  {
+    "action": "verified gain=65",
+    "spokenWord": "ползунок",
+    "voiceTime": 58.262,
+    "actionTime": 58.67,
+    "delaySeconds": 0.408
+  },
+  {
+    "action": "verified system=1",
+    "spokenWord": "компьютера",
+    "voiceTime": 61.8,
+    "actionTime": 62.453,
+    "delaySeconds": 0.653
+  },
+  {
+    "action": "system gain 50, mic remains 65",
+    "spokenWord": "пятьдесят",
+    "voiceTime": 65.962,
+    "actionTime": 66.589,
+    "delaySeconds": 0.627
+  },
+  {
+    "action": "quality dropdown open",
+    "spokenWord": "качество",
+    "voiceTime": 72.45,
+    "actionTime": 73.018,
+    "delaySeconds": 0.568
+  },
+  {
+    "action": "verified quality=2",
+    "spokenWord": "тридцать",
+    "voiceTime": 75.362,
+    "actionTime": 75.687,
+    "delaySeconds": 0.325
+  },
+  {
+    "action": "font menu open",
+    "spokenWord": "масштаб",
+    "voiceTime": 80.675,
+    "actionTime": 81.263,
+    "delaySeconds": 0.588
+  },
+  {
+    "action": "font 125%",
+    "spokenWord": "пять",
+    "voiceTime": 84.087,
+    "actionTime": 84.471,
+    "delaySeconds": 0.384
+  },
+  {
+    "action": "font menu reopened",
+    "spokenWord": "снова",
+    "voiceTime": 87.412,
+    "actionTime": 87.994,
+    "delaySeconds": 0.582
+  },
+  {
+    "action": "font 100%",
+    "spokenWord": "сто",
+    "voiceTime": 88.987,
+    "actionTime": 89.32,
+    "delaySeconds": 0.333
+  },
+  {
+    "action": "verified mic=0",
+    "spokenWord": "микрофон",
+    "voiceTime": 94.425,
+    "actionTime": 95.151,
+    "delaySeconds": 0.726
+  },
+  {
+    "action": "verified system=0",
+    "spokenWord": "затем",
+    "voiceTime": 95.4,
+    "actionTime": 96.107,
+    "delaySeconds": 0.707
+  },
+  {
+    "action": "area mode before demo",
+    "spokenWord": "область",
+    "voiceTime": 100.475,
+    "actionTime": 101.053,
+    "delaySeconds": 0.578
+  },
+  {
+    "action": "demo window shown",
+    "spokenWord": "окно",
+    "voiceTime": 102.462,
+    "actionTime": 102.664,
+    "delaySeconds": 0.202
+  },
+  {
+    "action": "capture button",
+    "spokenWord": "захватить",
+    "voiceTime": 105.062,
+    "actionTime": 105.645,
+    "delaySeconds": 0.583
+  },
+  {
+    "action": "selection mouse down",
+    "spokenWord": "верхнем",
+    "voiceTime": 108.925,
+    "actionTime": 108.93,
+    "delaySeconds": 0.005
+  },
+  {
+    "action": "selection mouse up: recording begins",
+    "spokenWord": "отпустите",
+    "voiceTime": 113.45,
+    "actionTime": 113.458,
+    "delaySeconds": 0.008
+  },
+  {
+    "action": "stop click",
+    "spokenWord": "остановить",
+    "voiceTime": 126.612,
+    "actionTime": 127.219,
+    "delaySeconds": 0.607
+  },
+  {
+    "action": "play click",
+    "spokenWord": "воспроизвести",
+    "voiceTime": 138.075,
+    "actionTime": 138.721,
+    "delaySeconds": 0.646
+  },
+  {
+    "action": "seek",
+    "spokenWord": "передвиньте",
+    "voiceTime": 142.0,
+    "actionTime": 142.248,
+    "delaySeconds": 0.248
+  },
+  {
+    "action": "start 1.000",
+    "spokenWord": "одна",
+    "voiceTime": 146.575,
+    "actionTime": 147.339,
+    "delaySeconds": 0.764
+  },
+  {
+    "action": "end 4.000",
+    "spokenWord": "четыре",
+    "voiceTime": 149.3,
+    "actionTime": 150.079,
+    "delaySeconds": 0.779
+  },
+  {
+    "action": "save trim click",
+    "spokenWord": "копию",
+    "voiceTime": 155.413,
+    "actionTime": 155.999,
+    "delaySeconds": 0.586
+  },
+  {
+    "action": "play trimmed copy",
+    "spokenWord": "воспроизвести",
+    "voiceTime": 164.65,
+    "actionTime": 165.251,
+    "delaySeconds": 0.601
+  }
+]
