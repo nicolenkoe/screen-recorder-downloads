@@ -2,7 +2,7 @@ package ru.screenrecorder.app;
 import android.content.*;import android.graphics.Rect;import android.hardware.display.*;import android.media.*;import android.media.projection.*;import android.net.Uri;import android.os.*;import android.provider.MediaStore;import android.util.DisplayMetrics;import android.view.*;import java.nio.*;import java.util.*;
 final class RecorderEngine {
  final Context context;final MediaProjection projection;final boolean mic,internal;volatile float gain;final int quality;
- volatile boolean stopped,paused;volatile Exception failure;long pauseAt,pausedUs,firstVideo=-1,lastVideo=-1;long audioFrames;
+ volatile boolean stopped,paused;volatile Exception failure;long pauseAt,firstVideo=-1,lastVideo=-1;volatile long pausedUs;long audioFrames;
  MediaCodec video,audio;MediaMuxer muxer;android.os.ParcelFileDescriptor fd;Surface surface;VirtualDisplay display;AudioRecord microphone,playback;Uri uri;Thread videoThread,audioThread;int videoTrack=-1,audioTrack=-1;boolean muxStarted;final List<Packet> queued=new ArrayList<>();int queuedBytes;
  static final class Packet{int track;byte[] bytes;MediaCodec.BufferInfo info;Packet(int t,byte[]b,MediaCodec.BufferInfo i){track=t;bytes=b;info=i;}}
  RecorderEngine(Context c,MediaProjection p,boolean m,boolean s,int g,int q){context=c;projection=p;mic=m;internal=s;gain=Math.max(0,Math.min(100,g))/100f;quality=q;}
