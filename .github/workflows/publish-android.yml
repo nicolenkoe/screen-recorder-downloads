@@ -1,0 +1,71 @@
+name: Publish signed Android APK
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        type: choice
+        options: [experimental, testing, stable]
+        default: experimental
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          python3 - <<'PY'
+          import os,base64,pathlib
+          if not os.environ.get('KEYSTORE_BASE64') or not os.environ.get('KEYSTORE_PASSWORD'):
+              raise SystemExit('Add repository secrets KEYSTORE_BASE64 and KEYSTORE_PASSWORD from the private signing backup first.')
+          root=pathlib.Path('.private');root.mkdir(mode=0o700,exist_ok=True)
+          (root/'recorder.jks').write_bytes(base64.b64decode(os.environ['KEYSTORE_BASE64'],validate=True))
+          PY
+      - name: Assign increasing version
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          python3 - <<'PY'
+          import os,xml.etree.ElementTree as ET
+          ns='http://schemas.android.com/apk/res/android';ET.register_namespace('android',ns)
+          p='android/AndroidManifest.xml';t=ET.parse(p);r=t.getroot()
+          r.set('{'+ns+'}versionCode',str(20000+int(os.environ['RUN_NUMBER'])))
+          r.set('{'+ns+'}versionName','0.1.'+os.environ['RUN_NUMBER'])
+          t.write(p,encoding='utf-8',xml_declaration=True)
+          PY
+      - run: bash scripts/check.sh
+      - name: Build signed APK
+        env:
+          SIGNING_KEYSTORE: ${{ github.workspace }}/.private/recorder.jks
+          SIGNING_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: bash scripts/build-android.sh
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ inputs.channel }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          python3 - <<'PY'
+          import os,pathlib,hashlib,json
+          p=pathlib.Path('build/android/ScreenRecorder.apk');tag='android-0.1.'+os.environ['RUN_NUMBER']+'-'+os.environ['CHANNEL']
+          data={'packageName':'ru.screenrecorder.app','versionCode':20000+int(os.environ['RUN_NUMBER']),'minSdk':29,'abi':'universal','size':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'url':'https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/releases/download/'+tag+'/ScreenRecorder.apk'}
+          pathlib.Path('build/android/update.json').write_text(json.dumps(data,indent=2));pathlib.Path('build/android/tag.txt').write_text(tag)
+          PY
+          TAG=$(cat build/android/tag.txt)
+          FLAGS=()
+          if [ "$CHANNEL" != stable ]; then FLAGS+=(--prerelease); fi
+          gh release create "$TAG" build/android/ScreenRecorder.apk build/android/update.json --title "Android 0.1.$RUN_NUMBER ($CHANNEL)" --notes "Screen recorder. Android 10+. Test screen and audio capture on your device before use." "${FLAGS[@]}"
+      - name: Remove private files
+        if: always()
+        run: rm -rf .private
