@@ -1,5 +1,8 @@
 name: Publish signed Android APK
 on:
+  push:
+    branches: [main]
+    paths: ['release-request.json']
   workflow_dispatch:
     inputs:
       channel:
@@ -56,7 +59,7 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-          CHANNEL: ${{ inputs.channel }}
+          CHANNEL: ${{ inputs.channel || 'experimental' }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
           python3 - <<'PY'
