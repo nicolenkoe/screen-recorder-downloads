@@ -1,0 +1,26 @@
+{
+  "videoDuration": 126.4,
+  "bytes": 2844299,
+  "framesInspected": 3160,
+  "maxBlackPixelFraction": 0.0009104938271604938,
+  "minFrameMean": 31.477373971193416,
+  "blackFailures": [],
+  "originalUnchanged": true,
+  "stopButtonVisible": true,
+  "trimmedSeconds": 3.0,
+  "codecs": [
+    "h264",
+    "aac"
+  ],
+  "sha256": "3d1ba3525330fb52c9422435af72cb4cea362c1da4d90f61ccdc2fd1178b9ce4",
+  "synchronizedActions": 23,
+  "maxActionDelaySeconds": 0.908,
+  "audioMeanDb": -15.8,
+  "audioPeakDb": -1.3,
+  "browserLocal": {
+    "desktopPlayback": true,
+    "mobileViewportPlayback": true,
+    "all16StagesSeekable": true,
+    "networkFailurePosterAndMessage": true
+  }
+}
