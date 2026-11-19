@@ -1,6 +1,8 @@
 # Запись экрана — Android и Windows
 
-[Сайт](https://nicolenkoe.github.io/screen-recorder-downloads/) · [Скачать Android APK 0.1.1-experimental](https://github.com/nicolenkoe/screen-recorder-downloads/releases/download/android-0.1.1-experimental/ScreenRecorder.apk) · [Windows 3.0.2 EXE](https://github.com/nicolenkoe/screen-recorder-downloads/releases/download/windows-3.0.2/ScreenRecorder-Windows-3.0.2.exe)
+[Сайт](https://nicolenkoe.github.io/screen-recorder-downloads/) · [Скачать Android APK](https://nicolenkoe.github.io/screen-recorder-downloads/download.html?platform=android) · [Скачать Windows EXE](https://nicolenkoe.github.io/screen-recorder-downloads/download.html?platform=windows)
+
+На главной кнопки «Скачать» заново выбирают самую новую опубликованную сборку для своей платформы, включая тестовые и экспериментальные. [Список версий](https://nicolenkoe.github.io/screen-recorder-downloads/versions.html) вынесен на отдельную страницу: статусы, даты, фильтр платформы и скачивание конкретного выпуска. Каталог читается из GitHub Releases со всех страниц, черновики исключены.
 
 Android создаётся с нуля: запись экрана, микрофон и внутренний звук, громкость микрофона, пауза через уведомление, галерея, просмотр и быстрая обрезка копии. Android 10+. Это первый экспериментальный APK: сборка и подпись проверены, запись на реальном Android ещё не проверена.
 

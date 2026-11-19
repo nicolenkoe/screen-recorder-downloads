@@ -1,0 +1,12 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {latestBuild,listBuilds,channel,fetchReleases} from '../release-data.mjs';
+const asset=(name)=>({name,size:123,state:'uploaded',browser_download_url:'https://github.com/nicolenkoe/screen-recorder-downloads/releases/download/tag/'+name});
+const release=(tag,date,pre=false,names=['ScreenRecorder.apk'])=>({id:1,tag_name:tag,published_at:date,prerelease:pre,assets:names.map(asset)});
+test('newest experimental beats older stable for Android',()=>{const old=release('stable','2026-01-01'),exp=release('android-2-experimental','2026-02-01',true);assert.equal(latestBuild([old,exp],'android').tag,exp.tag_name);});
+test('newest stable beats older test; tag text is not version ordering',()=>{const newer=release('v2','2026-03-01'),old=release('v999-test','2026-02-01',true);assert.equal(latestBuild([old,newer],'android').tag,'v2');});
+test('Windows is selected independently of a newer Android',()=>{const w=release('windows-beta','2026-01-01',true,['ScreenRecorder-Windows-4-beta.exe']);assert.equal(latestBuild([release('android','2026-04-01'),w],'windows').tag,'windows-beta');});
+test('drafts, unpublished, incomplete and foreign assets are excluded',()=>{const entries=[{...release('draft','2026-04-01'),draft:true},release('none',null),release('helper','2026-05-01',false,['ffmpeg.exe']),{...release('foreign','2026-05-01'),assets:[{...asset('ScreenRecorder.apk'),browser_download_url:'https://example.org/app.apk'}]},{...release('pending','2026-05-01'),assets:[{...asset('ScreenRecorder.apk'),state:'uploading'}]}];assert.equal(listBuilds(entries).length,0);});
+test('channels distinguish stable, test and experimental',()=>{assert.equal(channel({tag_name:'windows-3',prerelease:false}).id,'stable');assert.equal(channel({tag_name:'windows-4-beta',prerelease:true}).id,'test');assert.equal(channel({tag_name:'android-experimental',prerelease:true}).id,'experimental');});
+test('all pages are read; a newer prerelease on second page is selected',async()=>{let pages=[];const first=Array.from({length:100},()=>release('old','2026-01-01'));const all=await fetchReleases(async(url)=>{pages.push(url);return {ok:true,json:async()=>pages.length===1?first:[release('new-test','2026-07-01',true)]};});assert.equal(pages.length,2);assert.equal(latestBuild(all,'android').tag,'new-test');});
+test('GitHub errors are surfaced instead of silently serving stale builds',async()=>{await assert.rejects(fetchReleases(async()=>({ok:false,status:403})),/403/);});
