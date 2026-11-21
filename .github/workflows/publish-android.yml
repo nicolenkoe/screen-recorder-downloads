@@ -63,15 +63,20 @@ jobs:
           RUN_NUMBER: ${{ github.run_number }}
         run: |
           python3 - <<'PY'
-          import os,pathlib,hashlib,json
-          p=pathlib.Path('build/android/ScreenRecorder.apk');tag='android-0.1.'+os.environ['RUN_NUMBER']+'-'+os.environ['CHANNEL']
-          data={'packageName':'ru.screenrecorder.app','versionCode':20000+int(os.environ['RUN_NUMBER']),'minSdk':29,'abi':'universal','size':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'url':'https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/releases/download/'+tag+'/ScreenRecorder.apk'}
-          pathlib.Path('build/android/update.json').write_text(json.dumps(data,indent=2));pathlib.Path('build/android/tag.txt').write_text(tag)
+          import os,pathlib,hashlib,json,xml.etree.ElementTree as ET
+          version=ET.parse('android/AndroidManifest.xml').getroot().get('{http://schemas.android.com/apk/res/android}versionName')
+          name='ScreenRecorder-Android-'+version+'-'+os.environ['CHANNEL']+'.apk'
+          p=pathlib.Path('build/android')/name
+          pathlib.Path('build/android/ScreenRecorder.apk').rename(p)
+          tag='android-0.1.'+os.environ['RUN_NUMBER']+'-'+os.environ['CHANNEL']
+          data={'packageName':'ru.screenrecorder.app','versionCode':20000+int(os.environ['RUN_NUMBER']),'minSdk':29,'abi':'universal','size':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'url':'https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/releases/download/'+tag+'/'+name}
+          pathlib.Path('build/android/update.json').write_text(json.dumps(data,indent=2));pathlib.Path('build/android/tag.txt').write_text(tag);pathlib.Path('build/android/asset-name.txt').write_text(name)
           PY
           TAG=$(cat build/android/tag.txt)
+          APK_NAME=$(cat build/android/asset-name.txt)
           FLAGS=()
           if [ "$CHANNEL" != stable ]; then FLAGS+=(--prerelease); fi
-          gh release create "$TAG" build/android/ScreenRecorder.apk build/android/update.json --title "Android 0.1.$RUN_NUMBER ($CHANNEL)" --notes "Screen recorder. Android 10+. Test screen and audio capture on your device before use." "${FLAGS[@]}"
+          gh release create "$TAG" "build/android/$APK_NAME" build/android/update.json --title "Android 0.1.$RUN_NUMBER ($CHANNEL)" --notes "New video editor and imports, multiple keep/remove ranges, still-pause shortening with conservative sound protection, separate pause/resume/stop controls, fullscreen 3-2-1 countdown, recording indicator, live audio source controls, themes and 110 percent scale. Sound protection keeps audio above -50 dB with 250 ms margins; it does not classify speech. Keyframe-based Android export may retain extra footage. Android 10+. Experimental: device capture and control interaction still require runtime validation." "${FLAGS[@]}"
       - name: Remove private files
         if: always()
         run: rm -rf .private

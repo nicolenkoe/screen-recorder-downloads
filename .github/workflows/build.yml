@@ -47,17 +47,21 @@ jobs:
           python-version: '3.12'
       - name: Verify audio gain
         run: gcc -std=c11 -Wall -Wextra tests/audio-gain.c -lm -o /tmp/audio-gain-test && /tmp/audio-gain-test
+      - name: Verify timeline and edit planner
+        run: gcc -std=c11 -Wall -Wextra tests/edit-model.c -lm -o /tmp/edit-model-test && /tmp/edit-model-test
+      - name: Verify automatic pause cut intervals
+        run: gcc -std=c11 -Wall -Wextra -Wno-unused-function tests/pause-model.c -lm -o /tmp/pause-model-test && /tmp/pause-model-test
       - run: bash scripts/build-windows.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-3.0.2
-          path: build/windows/ScreenRecorder-Windows-3.0.2.exe
+          name: windows-3.1.0
+          path: build/windows/ScreenRecorder-Windows-3.1.0.exe
       - name: Publish Windows download
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view windows-3.0.2 >/dev/null 2>&1; then
-            gh release upload windows-3.0.2 build/windows/ScreenRecorder-Windows-3.0.2.exe --clobber
+          if gh release view windows-3.1.0 >/dev/null 2>&1; then
+            gh release upload windows-3.1.0 build/windows/ScreenRecorder-Windows-3.1.0.exe --clobber
           else
-            gh release create windows-3.0.2 build/windows/ScreenRecorder-Windows-3.0.2.exe --title "Windows 3.0.2" --notes "Independent microphone and computer audio gain sliders, persisted volume levels and compact Scale menu; gallery preview and non-destructive trimming. Capture modes have native visual explanations, including an animated area selector. Multiple-window capture is not implemented; its diagram can be viewed but recording is disabled."
+            gh release create windows-3.1.0 build/windows/ScreenRecorder-Windows-3.1.0.exe --prerelease --title "Windows 3.1.0 (тестовая)" --notes "Automatic still-pause removal with conservative audio protection (non-silent sound above -50 dB and 250 ms margins; does not classify speech). Recording countdown 3-2-1, always-on-top recording panel and red frame; live microphone/system sound toggles; filmstrip editing with multiple keep/remove ranges and separate fragment export; imported videos, selectable thumbnail/list/table gallery, file actions; three themes, 110 percent scale and dark Windows title bars. Capture exclusion requires Windows support; if unavailable the app asks before displaying indicators that may appear in the recording."
           fi

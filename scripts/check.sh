@@ -4,6 +4,10 @@ cd "$(dirname "$0")/.."
 mkdir -p build/tests
 java -m jdk.compiler/com.sun.tools.javac.Main -d build/tests android/src/ru/screenrecorder/app/ReleasePolicy.java tests/ReleasePolicyTest.java
 java -cp build/tests ReleasePolicyTest
+java -m jdk.compiler/com.sun.tools.javac.Main -d build/tests android/src/ru/screenrecorder/app/PausePlan.java android/src/ru/screenrecorder/app/EditPlan.java android/src/ru/screenrecorder/app/AudioMix.java tests/AndroidEditTest.java
+java -cp build/tests ru.screenrecorder.app.AndroidEditTest
+java -m jdk.compiler/com.sun.tools.javac.Main -d build/tests android/src/ru/screenrecorder/app/RecordingControls.java tests/RecordingControlsTest.java
+java -cp build/tests ru.screenrecorder.app.RecordingControlsTest
 python3 - <<'PY'
 from pathlib import Path
 import xml.etree.ElementTree as ET

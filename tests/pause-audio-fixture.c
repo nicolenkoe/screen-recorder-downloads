@@ -1,0 +1,3 @@
+#include <assert.h>
+#include "../windows/pause_model.h"
+int main(int argc,char **argv){assert(argc==2);FILE *f=fopen(argv[1],"rb");assert(f);EditRange cuts[EDIT_MAX_RANGES],safe[EDIT_MAX_RANGES];double removed;int n=pause_read(f,17,1,cuts,&removed);assert(n==2);rewind(f);int k=pause_protect(f,cuts,n,17,safe);fclose(f);assert(k==4);double seconds=0;for(int i=0;i<k;i++){assert(safe[i].end<=1.751||safe[i].start>=4.249);assert(safe[i].end<=8.751||safe[i].start>=12.249);seconds+=safe[i].end-safe[i].start;}assert(fabs(seconds-7)<.08);puts("PASS: actual freeze+silence detection protects both sound intervals and 250ms margins");}

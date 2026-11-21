@@ -1,0 +1,84 @@
+package ru.screenrecorder.app;
+import android.app.*;import android.content.*;import android.graphics.*;import android.media.*;import android.net.Uri;import android.os.*;import android.view.*;import android.widget.*;import android.text.*;import java.util.*;
+final class EditorUi {
+ final MainActivity a;final Uri input;final String name;VideoView video;TextView clock,note;SeekBar seek;EditText from,to;Spinner rangesView;Film film;Button save;RadioButton keepMode,removeMode;MediaPlayer player;
+ final ArrayList<double[]> ranges=new ArrayList<>();double duration=0;int active=0,generation;boolean remove=false,updating=false,dragging=false;volatile boolean closed=false,busy=false;ProgressDialog analysisDialog;Thread exportThread;Handler handler=new Handler();Bitmap[] thumbnails=new Bitmap[12];
+ EditorUi(MainActivity activity,Uri uri,String title){a=activity;input=uri;name=title;}
+ void show(){
+  a.base("Просмотр и обрезка");TextView back=a.text("← Галерея",14);back.setOnClickListener(v->askClose());a.body.addView(back);a.body.addView(a.text(name,16));
+  video=new VideoView(a);a.body.addView(video,new LinearLayout.LayoutParams(-1,a.dp(230)));video.setVideoURI(input);
+  clock=a.text("Загрузка видео…",18);a.body.addView(clock);seek=new SeekBar(a);seek.setMax(10000);a.body.addView(seek);
+  seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){dragging=true;video.pause();}public void onStopTrackingTouch(SeekBar b){dragging=false;position(duration*b.getProgress()/10000.);}public void onProgressChanged(SeekBar b,int p,boolean user){if(user)time(duration*p/10000.);}});
+  a.button("Воспроизвести / Пауза",()->{if(video.isPlaying())video.pause();else video.start();},false);
+  RadioGroup modes=new RadioGroup(a);modes.setOrientation(1);keepMode=new RadioButton(a);keepMode.setText("Оставить выделенное");removeMode=new RadioButton(a);removeMode.setText("Удалить выделенное");for(RadioButton r:new RadioButton[]{keepMode,removeMode}){r.setTextColor(MainActivity.TEXT);r.setTextSize(16*a.font());r.setId(View.generateViewId());modes.addView(r);}keepMode.setChecked(true);modes.setOnCheckedChangeListener((g,id)->{remove=id==removeMode.getId();if(film!=null)film.invalidate();});a.body.addView(modes);
+  film=new Film();a.body.addView(film,new LinearLayout.LayoutParams(-1,a.dp(150)));
+  a.body.addView(a.text("Потяните края. Долгое нажатие на оставленный кусочек — сохранить его отдельно.",14));
+  LinearLayout fields=new LinearLayout(a);from=new EditText(a);to=new EditText(a);for(EditText e:new EditText[]{from,to}){e.setTextColor(MainActivity.TEXT);e.setTextSize(17*a.font());e.setInputType(8194);fields.addView(e,new LinearLayout.LayoutParams(0,-2,1));}from.setHint("Начало, с");to.setHint("Конец, с");a.body.addView(fields);
+  TextWatcher watcher=new TextWatcher(){public void beforeTextChanged(CharSequence s,int p,int c,int after){}public void onTextChanged(CharSequence s,int p,int before,int c){if(!updating&&validFields()){refreshRangeNames();film.invalidate();}}public void afterTextChanged(Editable e){}};from.addTextChangedListener(watcher);to.addTextChangedListener(watcher);
+  rangesView=new Spinner(a);a.body.addView(rangesView);rangesView.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int index,long id){if(!busy&&!updating&&index<ranges.size()&&index!=active){active=index;fields();position(ranges.get(active)[0]);}}});
+  a.button("+ Добавить фрагмент",()->{if(busy||duration<=0)return;if(!validFields()){a.message("Исправьте границы текущего фрагмента");return;}if(ranges.size()>=EditPlan.MAX){a.message("Можно выделить до 64 фрагментов");return;}double start=Math.min(video.getCurrentPosition()/1000.,Math.max(0,duration-.1));ranges.add(new double[]{start,Math.min(duration,start+Math.max(.1,Math.min(5,duration/4)))});active=ranges.size()-1;fields();},false);
+  a.button("Убрать фрагмент",()->{if(busy||ranges.isEmpty())return;if(ranges.size()>1){ranges.remove(active);active=Math.min(active,ranges.size()-1);}else{ranges.set(0,new double[]{0,duration});keepMode.setChecked(true);}fields();},false);
+  a.button("Начало — текущий кадр",()->{if(!ranges.isEmpty()){ranges.get(active)[0]=Math.min(video.getCurrentPosition()/1000.,ranges.get(active)[1]-.01);fields();}},false);
+  a.button("Конец — текущий кадр",()->{if(!ranges.isEmpty()){ranges.get(active)[1]=Math.max(video.getCurrentPosition()/1000.,ranges.get(active)[0]+.01);fields();}},false);
+  a.button("Убрать паузы…",()->pauseSettings(),false);
+  note=a.text("Android: быстрая обрезка по ключевым кадрам. Начало может сдвинуться назад до ключевого кадра, чтобы не потерять речь. Соседние перекрывающиеся части объединяются. Исходник не изменяется.",14);a.body.addView(note);
+  save=a.button("Сохранить копию",()->{try{if(!validFields())throw new Exception("Проверьте границы");export(EditPlan.keep(ranges,duration,remove),false);}catch(Exception e){a.message(e.getMessage());}},true);
+  a.button("Поделиться",()->{Intent i=new Intent(Intent.ACTION_SEND).setType("video/mp4").putExtra(Intent.EXTRA_STREAM,input).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);a.startActivity(Intent.createChooser(i,"Отправить видео"));},false);
+  video.setOnPreparedListener(p->{player=p;duration=video.getDuration()/1000.;ranges.clear();ranges.add(new double[]{0,duration});fields();video.seekTo(1);thumbnails();handler.post(tick);});
+  video.setOnErrorListener((m,w,e)->{a.message("Не удалось воспроизвести файл. Поддержка формата зависит от Android.");return true;});
+ }
+ void pauseSettings(){
+  if(busy||duration<=0)return;EditText seconds=new EditText(a);seconds.setInputType(8194);seconds.setText(a.prefs.getString("pauseRetain","1"));
+  LinearLayout box=new LinearLayout(a);box.setOrientation(1);box.setPadding(a.dp(20),0,a.dp(20),0);box.addView(a.text("Оставлять неподвижный участок не длиннее (секунд). Анализ заменит текущее выделение. При включённой защите звуковые участки сохраняются. Если выключить защиту, звук внутри вырезок удалится.\n\nAndroid: проверка картинки каждые 0,2 с. Короткие движения могут быть пропущены — проверьте результат.",14));box.addView(seconds);Switch protect=new Switch(a);protect.setText("Сохранять речь и звук");protect.setTextColor(MainActivity.TEXT);protect.setChecked(a.prefs.getBoolean("protectPauseSound",true));box.addView(protect);box.addView(a.text("Защищаем любой звук громче −50 дБ, с запасом 0,25 с. Это защита звука, а не распознавание речи. Выключите для обработки только по картинке.",14));
+  AlertDialog dialog=new AlertDialog.Builder(a).setTitle("Убрать паузы").setView(box).setNegativeButton("Отмена",null).setPositiveButton("Найти паузы",null).create();dialog.setOnShowListener(d->dialog.getButton(-1).setOnClickListener(v->{
+   try{double retain=Double.parseDouble(seconds.getText().toString().replace(',','.'));PausePlan.cuts(Collections.emptyList(),duration,retain);a.prefs.edit().putString("pauseRetain",seconds.getText().toString()).apply();a.prefs.edit().putBoolean("protectPauseSound",protect.isChecked()).apply();dialog.dismiss();findPauses(retain,protect.isChecked());}catch(Exception e){seconds.setError("Укажите число от 0,1 до 600");}
+  }));dialog.show();
+ }
+ void findPauses(double retain,boolean protect){
+  busy=true;video.pause();save.setEnabled(false);note.setText("Ищем неподвижные участки… Исходник не изменяется.");
+  ProgressDialog progress=new ProgressDialog(a);analysisDialog=progress;progress.setMessage("Ищем неподвижные участки…");progress.setCancelable(false);progress.setButton(-2,"Отменить",(d,w)->{if(exportThread!=null)exportThread.interrupt();});progress.show();
+  exportThread=new Thread(()->{try{ArrayList<double[]> detected=PauseDetector.find(a,input,duration,retain);ArrayList<double[]> cuts=protect?PausePlan.protect(detected,SoundProtection.find(a,input,duration),duration):detected;a.runOnUiThread(()->{progress.dismiss();busy=false;if(closed)return;save.setEnabled(true);if(cuts.isEmpty()){note.setText("Нет подходящих пауз: картинка меняется либо звук защищён. Выделение не изменено.");return;}ranges.clear();ranges.addAll(cuts);active=0;removeMode.setChecked(true);fields();position(cuts.get(0)[0]);double removed=0;for(double[] r:cuts)removed+=r[1]-r[0];note.setText(String.format(Locale.US,"Найдено пауз: %d. Предлагается убрать %.2f с. Защита звука учитывает выбранный режим. Проверьте шкалу. На Android границы сохранения зависят от ключевых кадров.",cuts.size(),removed));});}catch(Exception e){a.runOnUiThread(()->{progress.dismiss();busy=false;if(!closed){save.setEnabled(true);note.setText(e instanceof InterruptedException?"Анализ отменён. Выделение не изменено.":"Не удалось проанализировать видео: "+e.getMessage());}});}},"video-pause-analysis");exportThread.start();
+ }
+ void time(double seconds){if(clock!=null)clock.setText(EditPlan.clock(seconds)+" / "+EditPlan.clock(duration)+"\n"+String.format(Locale.US,"Текущая позиция: %.3f с",seconds));}
+ void position(double seconds){video.pause();video.seekTo((int)(Math.max(0,Math.min(duration,seconds))*1000));time(seconds);if(!dragging)seek.setProgress(duration>0?(int)(seconds*10000/duration):0);film.invalidate();}
+ boolean validFields(){
+  if(ranges.isEmpty()||busy)return false;try{double start=Double.parseDouble(from.getText().toString().replace(',','.')),end=Double.parseDouble(to.getText().toString().replace(',','.'));if(!Double.isFinite(start)||!Double.isFinite(end)||start<0||end<=start||end>duration+.001)return false;ranges.set(active,new double[]{start,Math.min(duration,end)});return true;}catch(Exception e){return false;}
+ }
+ void fields(){if(ranges.isEmpty())return;updating=true;from.setText(String.format(Locale.US,"%.3f",ranges.get(active)[0]));to.setText(String.format(Locale.US,"%.3f",ranges.get(active)[1]));updating=false;refreshRangeNames();film.invalidate();}
+ void refreshRangeNames(){if(rangesView==null)return;updating=true;ArrayList<String> labels=new ArrayList<>();for(int i=0;i<ranges.size();i++)labels.add((i+1)+". "+EditPlan.clock(ranges.get(i)[0])+" — "+EditPlan.clock(ranges.get(i)[1]));rangesView.setAdapter(new ArrayAdapter<String>(a,android.R.layout.simple_spinner_dropdown_item,labels));rangesView.setSelection(active);updating=false;}
+ void export(List<double[]> keep,boolean single){
+  if(busy)return;if(keep.isEmpty()){a.message("После обрезки не остаётся видео. Измените выделение.");return;}ArrayList<double[]> copy=new ArrayList<>();for(double[] r:keep)copy.add(r.clone());busy=true;video.pause();save.setEnabled(false);note.setText("Сохраняем копию… Исходный файл не изменяется.");
+  exportThread=new Thread(()->{try{Uri result=Trim.pieces(a,input,copy,single);a.runOnUiThread(()->{busy=false;if(closed)return;save.setEnabled(true);note.setText(single?"Фрагмент сохранён отдельно. Можно сохранить следующий.":"Копия сохранена в галерее. Исходник не изменён.");if(!single)a.message("Копия сохранена. Её можно открыть в галерее.");});}catch(Exception e){a.runOnUiThread(()->{busy=false;if(!closed){save.setEnabled(true);note.setText("Не удалось сохранить копию");a.message("Обрезка: "+e.getMessage());}});}},"video-edit-export");exportThread.start();
+ }
+ void piece(double at){
+  if(busy||duration<=0)return;try{List<double[]> keep=EditPlan.keep(ranges,duration,remove);for(double[] r:keep)if(at>=r[0]&&at<=r[1]){new AlertDialog.Builder(a).setTitle(EditPlan.clock(r[0])+" — "+EditPlan.clock(r[1])).setItems(new String[]{"Сохранить этот фрагмент отдельно"},(d,w)->export(Collections.singletonList(r),true)).show();return;}a.message("Этот участок помечен на удаление.");}catch(Exception e){a.message(e.getMessage());}
+ }
+ void thumbnails(){int epoch=++generation;new Thread(()->{MediaMetadataRetriever meta=new MediaMetadataRetriever();try{meta.setDataSource(a,input);for(int i=0;i<thumbnails.length&&!closed;i++){Bitmap b=meta.getScaledFrameAtTime((long)(duration*(i+.5)/thumbnails.length*1000000),MediaMetadataRetriever.OPTION_CLOSEST_SYNC,160,90);final int index=i;a.runOnUiThread(()->{if(!closed&&generation==epoch){thumbnails[index]=b;film.invalidate();}else if(b!=null)b.recycle();});}}catch(Exception ignored){}finally{try{meta.release();}catch(Exception ignored){}}},"filmstrip-thumbnails").start();}
+ final Runnable tick=new Runnable(){public void run(){if(closed)return;if(!dragging){double at=video.getCurrentPosition()/1000.;time(at);seek.setProgress(duration>0?(int)(at*10000/duration):0);film.invalidate();}handler.postDelayed(this,150);}};
+ void askClose(){if(busy)new AlertDialog.Builder(a).setMessage("Отменить сохранение копии и выйти? Исходник останется.").setNegativeButton("Остаться",null).setPositiveButton("Выйти",(d,w)->{close();a.gallery();}).show();else{close();a.gallery();}}
+ void close(){closed=true;if(analysisDialog!=null)analysisDialog.dismiss();if(exportThread!=null)exportThread.interrupt();generation++;handler.removeCallbacks(tick);if(video!=null)video.stopPlayback();for(Bitmap b:thumbnails)if(b!=null&&!b.isRecycled())b.recycle();}
+ final class Film extends View{
+  final Paint paint=new Paint(3);final GestureDetector gesture;int handle=-1;float left,right,top,bottom;
+  Film(){super(a);setLayerType(View.LAYER_TYPE_SOFTWARE,null);gesture=new GestureDetector(a,new GestureDetector.SimpleOnGestureListener(){public boolean onDown(android.view.MotionEvent e){return true;}public void onLongPress(android.view.MotionEvent e){if(handle<0)piece(at(e.getX()));}});}
+  double at(float x){return Math.max(0,Math.min(duration,duration*(x-left)/Math.max(1,right-left)));}
+  float x(double sec){return left+(float)(duration>0?(right-left)*sec/duration:0);}
+  protected void onDraw(Canvas c){
+   super.onDraw(c);left=a.dp(14);right=getWidth()-a.dp(14);top=a.dp(16);bottom=a.dp(106);paint.setColor(MainActivity.SURFACE);c.drawRoundRect(left,top,right,bottom,a.dp(8),a.dp(8),paint);
+   for(int i=0;i<thumbnails.length;i++)if(thumbnails[i]!=null&&!thumbnails[i].isRecycled())c.drawBitmap(thumbnails[i],null,new RectF(left+(right-left)*i/12,top,left+(right-left)*(i+1)/12,bottom),paint);
+   if(!ranges.isEmpty()&&duration>0){
+    try{List<double[]> keep=EditPlan.keep(ranges,duration,remove);paint.setColor(0x99000000);c.drawRect(left,top,right,bottom,paint);for(double[] r:keep){int save=c.save();c.clipRect(x(r[0]),top,x(r[1]),bottom);for(int i=0;i<thumbnails.length;i++)if(thumbnails[i]!=null&&!thumbnails[i].isRecycled())c.drawBitmap(thumbnails[i],null,new RectF(left+(right-left)*i/12,top,left+(right-left)*(i+1)/12,bottom),null);c.restoreToCount(save);}}catch(Exception ignored){}
+    for(int i=0;i<ranges.size();i++){double[] r=ranges.get(i);paint.setColor(remove?0x66ff4155:0x3370edbb);paint.setStyle(Paint.Style.FILL);c.drawRect(x(r[0]),top,x(r[1]),bottom,paint);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(a.dp(i==active?3:1));paint.setColor(remove?0xffff4155:MainActivity.MINT);c.drawRect(x(r[0]),top,x(r[1]),bottom,paint);}paint.setStyle(Paint.Style.FILL);
+    for(double edge:ranges.get(active)){float e=x(edge);paint.setColor(remove?0xffff536a:MainActivity.MINT);c.drawRoundRect(e-a.dp(8),top-a.dp(2),e+a.dp(8),bottom+a.dp(2),a.dp(6),a.dp(6),paint);paint.setColor(MainActivity.BG);paint.setStrokeWidth(a.dp(2));c.drawLine(e-a.dp(2),top+a.dp(28),e-a.dp(2),bottom-a.dp(28),paint);c.drawLine(e+a.dp(2),top+a.dp(28),e+a.dp(2),bottom-a.dp(28),paint);}
+   }
+   paint.setColor(MainActivity.TEXT);paint.setStrokeWidth(a.dp(2));float cursor=x(video.getCurrentPosition()/1000.);c.drawLine(cursor,top-a.dp(6),cursor,bottom+a.dp(4),paint);
+   paint.setTextSize(a.dp(12));paint.setColor(MainActivity.MUTED);String end=EditPlan.clock(duration);c.drawText("00:00",left,bottom+a.dp(24),paint);c.drawText(end,Math.max(left,right-paint.measureText(end)),bottom+a.dp(24),paint);
+  }
+  public boolean onTouchEvent(android.view.MotionEvent e){
+   if(busy||duration<=0||ranges.isEmpty())return true;gesture.onTouchEvent(e);
+   if(e.getAction()==MotionEvent.ACTION_DOWN){float start=x(ranges.get(active)[0]),end=x(ranges.get(active)[1]);handle=Math.abs(e.getX()-start)<=a.dp(25)||Math.abs(e.getX()-end)<=a.dp(25)?(Math.abs(e.getX()-start)<=Math.abs(e.getX()-end)?0:1):-1;if(handle>=0)getParent().requestDisallowInterceptTouchEvent(true);video.pause();return true;}
+   if(e.getAction()==MotionEvent.ACTION_MOVE&&handle>=0){double[] r=ranges.get(active);double gap=Math.min(.05,duration/100);if(handle==0)r[0]=Math.min(at(e.getX()),r[1]-gap);else r[1]=Math.max(at(e.getX()),r[0]+gap);fields();return true;}
+   if(e.getAction()==MotionEvent.ACTION_UP){if(handle>=0)position(ranges.get(active)[handle]);else if(e.getEventTime()-e.getDownTime()<400)position(at(e.getX()));handle=-1;getParent().requestDisallowInterceptTouchEvent(false);return true;}
+   if(e.getAction()==MotionEvent.ACTION_CANCEL){handle=-1;getParent().requestDisallowInterceptTouchEvent(false);}return true;
+  }
+ }
+}

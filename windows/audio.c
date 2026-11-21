@@ -70,6 +70,7 @@ static DWORD WINAPI capture(LPVOID ctx) {
             if(written>=maxFrames) count=0;
             else if(count>maxFrames-written) count=maxFrames-written;
             if(ok && count){const BYTE *samples=(flags&AUDCLNT_BUFFERFLAGS_SILENT)?NULL:bytes+(size_t)skip*format->nBlockAlign;
+                if(InterlockedCompareExchange(&a->muted,0,0))samples=NULL;
                 if(samples){size_t needed=(size_t)count*format->nBlockAlign;if(needed>scaledCapacity){if(scaled)HeapFree(GetProcessHeap(),0,scaled);scaled=HeapAlloc(GetProcessHeap(),0,needed);scaledCapacity=needed;}
                     if(!scaled){hr=E_OUTOFMEMORY;IAudioCaptureClient_ReleaseBuffer(capture,frames);goto cleanup;}memcpy(scaled,samples,needed);
                     int floating=format->wFormatTag==WAVE_FORMAT_IEEE_FLOAT||(format->wFormatTag==WAVE_FORMAT_EXTENSIBLE&&((WAVEFORMATEXTENSIBLE*)format)->SubFormat.Data1==WAVE_FORMAT_IEEE_FLOAT);
