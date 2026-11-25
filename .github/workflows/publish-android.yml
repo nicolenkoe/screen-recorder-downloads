@@ -76,7 +76,7 @@ jobs:
           APK_NAME=$(cat build/android/asset-name.txt)
           FLAGS=()
           if [ "$CHANNEL" != stable ]; then FLAGS+=(--prerelease); fi
-          gh release create "$TAG" "build/android/$APK_NAME" build/android/update.json --title "Android 0.1.$RUN_NUMBER ($CHANNEL)" --notes "New video editor and imports, multiple keep/remove ranges, still-pause shortening with conservative sound protection, separate pause/resume/stop controls, fullscreen 3-2-1 countdown, recording indicator, live audio source controls, themes and 110 percent scale. Sound protection keeps audio above -50 dB with 250 ms margins; it does not classify speech. Keyframe-based Android export may retain extra footage. Android 10+. Experimental: device capture and control interaction still require runtime validation." "${FLAGS[@]}"
+          gh release create "$TAG" "build/android/$APK_NAME" build/android/update.json --title "Android 0.1.$RUN_NUMBER ($CHANNEL)" --notes "Tap the version number on the home screen to check for updates. Explicit checks show progress feedback, remain explicit if an automatic check is already running, and can offer an already downloaded update despite an earlier Later choice. Signed APK; existing recording and editor features preserved. Experimental: device runtime validation remains pending." "${FLAGS[@]}"
       - name: Remove private files
         if: always()
         run: rm -rf .private

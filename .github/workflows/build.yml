@@ -61,7 +61,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view windows-3.1.0 >/dev/null 2>&1; then
-            gh release upload windows-3.1.0 build/windows/ScreenRecorder-Windows-3.1.0.exe --clobber
+            echo 'Windows 3.1.0 already published; keeping its asset immutable.'
           else
             gh release create windows-3.1.0 build/windows/ScreenRecorder-Windows-3.1.0.exe --prerelease --title "Windows 3.1.0 (тестовая)" --notes "Automatic still-pause removal with conservative audio protection (non-silent sound above -50 dB and 250 ms margins; does not classify speech). Recording countdown 3-2-1, always-on-top recording panel and red frame; live microphone/system sound toggles; filmstrip editing with multiple keep/remove ranges and separate fragment export; imported videos, selectable thumbnail/list/table gallery, file actions; three themes, 110 percent scale and dark Windows title bars. Capture exclusion requires Windows support; if unavailable the app asks before displaying indicators that may appear in the recording."
           fi
